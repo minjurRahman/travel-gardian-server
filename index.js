@@ -49,14 +49,35 @@ async function run(){
 
         app.get('/displayReview', async(req, res) =>{
             let query = {};
-            if(req.query.placeName){
+            if(req.query.email){
                 query = {
-                    title: req.query.placeName
+                    email: req.query.email
                 }
             }
             const cursor = reviewCollection.find(query);
             const review = await cursor.toArray();
             res.send(review);
+        })
+
+        app.patch('/userReview/:id', async (req, res) =>{
+            const id = req.params.id;
+            const status = req.body.status;
+            const query = { _id: ObjectId(id)};
+            const updatedDoc = {
+                $set:{
+                    status: status
+                }
+            }
+            const result = await reviewCollection.updateOne(query, updatedDoc);
+            res.send(result);
+
+        })
+
+        app.delete('/userReview/:id', async(req, res) =>{
+            const id = req.params.id;
+            const query = { _id: ObjectId(id) };
+            const result = await reviewCollection.deleteOne(query)
+            res.send(result);
         })
 
 
