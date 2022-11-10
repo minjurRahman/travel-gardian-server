@@ -1,5 +1,6 @@
 const express = require('express');
 const cors = require('cors');
+const jwt = require('jsonwebtoken');
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 require('dotenv').config();
 
@@ -19,6 +20,23 @@ app.get('/', (req, res) =>{
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASSWORD}@cluster0.bjaguop.mongodb.net/?retryWrites=true&w=majority`;
 const client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology: true, serverApi: ServerApiVersion.v1 });
 
+//Verify JWT token
+function verifyJWT(req, res, next){
+    const authJWT = req.headers.authorization;
+    if(!authJWT){
+        res.status(401).send({message: 'Unauthorized Access'})
+    }
+    const token = authJWT.split(' ')[1];
+    jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, function(err, decoded){
+        if(err){
+            res.status(403).send({message: 'Forbidden Access'})
+        }
+        req.decoded = decoded;
+    })
+    next();
+}
+
+
 //CRUD Operation
 async function run(){
     try{
@@ -26,6 +44,13 @@ async function run(){
         const reviewCollection = client.db('travelGuardian').collection('userReview');
 
         app.get('/services', async(req, res) =>{
+            const query = {};
+            const cursor = serviceCollection.find(query);
+            const services = await cursor.limit(3).toArray();
+            res.send(services);
+        })
+
+        app.get('/more-services', async(req, res) =>{
             const query = {};
             const cursor = serviceCollection.find(query);
             const services = await cursor.toArray();
@@ -53,7 +78,12 @@ async function run(){
             res.send(result);
         })
 
-        app.get('/displayReview', async(req, res) =>{
+        app.get('/displayReview', verifyJWT, async(req, res) =>{
+            const decoded = req.decoded;
+            if(decoded.email !== req.query.email){
+                res.status(403).send({message: 'Forbidden access'})
+            }
+
             let query = {};
             if(req.query.email){
                 query = {
@@ -84,6 +114,13 @@ async function run(){
             const query = { _id: ObjectId(id) };
             const result = await reviewCollection.deleteOne(query)
             res.send(result);
+        })
+
+        //JWT token
+        app.post('/jwt', (req, res) =>{
+            const user = req.body;
+            const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, {expiresIn: '7d'});
+            res.send({token})
         })
 
 
