@@ -23,17 +23,19 @@ const client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology:
 //Verify JWT token
 function verifyJWT(req, res, next){
     const authJWT = req.headers.authorization;
+
     if(!authJWT){
-        res.status(401).send({message: 'Unauthorized Access'})
+       return res.status(401).send({message: 'Unauthorized Access'});
     }
     const token = authJWT.split(' ')[1];
+
     jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, function(err, decoded){
         if(err){
-            res.status(403).send({message: 'Forbidden Access'})
+           return res.status(403).send({message: 'Forbidden Access'})
         }
         req.decoded = decoded;
+        next();
     })
-    next();
 }
 
 
@@ -78,12 +80,24 @@ async function run(){
             res.send(result);
         })
 
-        app.get('/displayReview', verifyJWT, async(req, res) =>{
+        app.get('/displayReview', verifyJWT,  async(req, res) =>{
             const decoded = req.decoded;
             if(decoded.email !== req.query.email){
                 res.status(403).send({message: 'Forbidden access'})
             }
 
+            let query = {};
+            if(req.query.email){
+                query = {
+                    email: req.query.email
+                }
+            }
+            const cursor = reviewCollection.find(query);
+            const review = await cursor.toArray();
+            res.send(review);
+        })
+
+        app.get('/displayReviews',  async(req, res) =>{
             let query = {};
             if(req.query.email){
                 query = {
@@ -123,9 +137,6 @@ async function run(){
             res.send({token})
         })
 
-
-
-
     }
     catch(error){
         console.log(error.name, error.message.bold, error.stack)
@@ -136,13 +147,6 @@ async function run(){
 }
 
 run();
-
-
-
-
-
-
-
 
 app.listen(port, () =>{
     console.log(`Travel Guardian Server Running On Port ${port}`);
